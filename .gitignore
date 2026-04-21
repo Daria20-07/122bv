@@ -1,0 +1,13 @@
+#Python
+_pycahe_/
+*.pyc
+*.pyo
+#Данные
+data.json
+test_data.json
+#IDE
+.vscode/
+.idea/
+#Системные 
+.DS_Store
+Thumbs.db
