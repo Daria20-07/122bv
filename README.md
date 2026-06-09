@@ -38,8 +38,5 @@ Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ 
 ## Быстрый запуск
 
 ```bash
-cd C:\Users\Honor\122bv
 py -m src.db
 py -m unittest tests.test_memory -v
-рта, создать __init__.py
-New-Item -Path tests\__init__.py -ItemType File -Force
