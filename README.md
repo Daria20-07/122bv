@@ -1,10 +1,10 @@
 # In-Memory Database (OOP Version)
 
-## Description
+## Описание
 
 Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ test coverage.
 
-## Project Structure
+## Структура проекта
 122bv/
 ├── src/db/
 │ ├── backend/
@@ -16,7 +16,7 @@ Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ 
 │ └── test_memory.py # Unit tests
 └── README.md
 
-## Features
+## Особенности
 
 - CREATE, READ, UPDATE, DELETE operations
 - Sort records by any field (ascending/descending)
@@ -25,7 +25,7 @@ Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ 
 - Custom exceptions
 - 90%+ test coverage
 
-## Quick Start
+## Быстрый запуск
 
 ```bash
 cd C:\Users\Honor\122bv
