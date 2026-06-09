@@ -6,15 +6,24 @@ Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ 
 
 ## Структура проекта
 122bv/
+
 ├── src/db/
 │ ├── backend/
+
 │ │ ├── errors.py # Custom exceptions
+
 │ │ └── memory.py # Database and Table classes
+
 │ ├── main.py # Entry point
+
 │ └── tui.py # OOP UI
+
 ├── tests/
+
 │ └── test_memory.py # Unit tests
+
 └── README.md
+
 
 ## Особенности
 
