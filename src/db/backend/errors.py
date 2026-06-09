@@ -13,18 +13,23 @@ class TableNotFoundError(DatabaseError):
     pass
 
 
+class TableAlreadyExistsError(DatabaseError):
+    """Raised when trying to create a table that already exists."""
+    pass
+
+
 class RecordNotFoundError(DatabaseError):
     """Raised when accessing a non-existent record."""
     pass
 
 
-class ValidationError(DatabaseError):
-    """Raised when data validation fails."""
+class DuplicateIDError(DatabaseError):
+    """Raised when trying to create a record with duplicate ID."""
     pass
 
 
-class DuplicateIDError(ValidationError):
-    """Raised when trying to create a record with duplicate ID."""
+class ValidationError(DatabaseError):
+    """Raised when data validation fails."""
     pass
 
 
@@ -35,4 +40,14 @@ class InvalidFieldTypeError(ValidationError):
 
 class MissingFieldError(ValidationError):
     """Raised when required field is missing."""
+    pass
+
+
+class InvalidStorageDataError(DatabaseError):
+    """Raised when reading corrupted data from file."""
+    pass
+
+
+class IndexError(DatabaseError):
+    """Raised when index operations fail."""
     pass

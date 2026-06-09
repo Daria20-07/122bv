@@ -6,7 +6,6 @@ from .tui import run
 
 
 def main():
-    """Main function."""
     run()
 
 
