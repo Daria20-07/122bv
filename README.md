@@ -1,55 +1,90 @@
-# In-Memory Database (OOP Version)
+# In-Memory Database Management System (File Storage Version)
 
-## Description
+## Описание проекта
 
-Object-oriented in-memory database with full CRUD operations, sorting, and 90%+ test coverage.
+Объектно-ориентированная система управления базами данных с поддержкой различных способов хранения данных. Реализована на Python с использованием принципов SOLID, паттернов проектирования и TDD.
 
-## Project Structure
-122bv/
-├── src/db/
+## Структура проекта
+PIOA-122bv/
+
+├── src/
+
+│ └── db/
+
 │ ├── backend/
-│ │ ├── errors.py # Custom exceptions
-│ │ └── memory.py # Database and Table classes
-│ ├── main.py # Entry point
-│ └── tui.py # OOP UI
+
+│ │ ├── init.py # Инициализация пакета
+
+│ │ ├── errors.py # Пользовательские исключения
+
+│ │ ├── database.py # Абстрактный интерфейс Database
+
+│ │ ├── table.py # Класс Table с индексами
+
+│ │ ├── memory.py # In-memory реализация
+
+│ │ ├── file.py # JSON файловая реализация
+
+│ │ └── csvdb.py # CSV файловая реализация 
+
+│ ├── init.py
+
+│ ├── main.py # Точка входа
+
+│ └── tui.py # Пользовательский интерфейс (ООП)
+
+├── data/ # Директория для JSON файлов
+
+├── data_csv/ # Директория для CSV файлов
+
 ├── tests/
-│ └── test_memory.py # Unit tests
+
+│ ├── init.py
+
+│ ├── test_memory.py # Тесты in-memory
+
+│ ├── test_file_database.py # Тесты JSON БД
+
+│ └── test_csv_database.py # Тесты CSV БД 
+
 └── README.md
 
-## Features
+## Реализованная функциональность
 
-- CREATE, READ, UPDATE, DELETE operations
-- Sort records by any field (ascending/descending)
-- Multiple tables with dynamic schemas
-- Type validation (str, int)
-- Custom exceptions
-- 90%+ test coverage
+### Основные возможности
 
-## Quick Start
+| Операция | Описание |
+|----------|----------|
+| CREATE | Добавление новых записей с автоматической генерацией ID |
+| READ | Чтение записей с фильтрацией по любому полю |
+| UPDATE | Обновление существующих записей по ID |
+| DELETE | Удаление записей по ID |
 
-```bash
-cd C:\Users\Honor\122bv
-py -m src.db
-py -m unittest tests.test_memory -v
-1. Add record (CREATE)
-2. View records (READ)
-3. Update record (UPDATE)
-4. Delete record (DELETE)
-5. Sort records (SORT)
-6. Create table
-7. Delete table
-8. Clear table
-9. List tables
-0. Exit
+### Способы хранения данных
 
-### 10. Запустить тесты и проверить
+| Тип | Описание | Преимущества | Недостатки |
+|-----|----------|--------------|------------|
+| **In-Memory** | Данные хранятся в RAM | Максимальная скорость | Данные теряются при выходе |
+| **JSON File** | Данные в JSON файлах | Человеко-читаемый формат | Медленнее in-memory |
+| **CSV File** | Данные в CSV файлах | Поддержка Excel | Нет вложенных структур |
+
+### Дополнительные возможности 
+
+- **Индексация данных** - ускорение поиска по индексированным полям
+- **Сортировка записей** - по любому полю в любом порядке
+- **Множественные таблицы** - неограниченное количество таблиц
+- **Динамическая схема** - произвольные поля с типами str и int
+
+## Инструкция по запуску
+
+### Установка и запуск
 
 ```powershell
-# Убедиться, что находимся в корне проекта
+# 1. Перейти в корневую директорию проекта
 cd C:\Users\Honor\122bv
 
-# Запустить тесты
-py -m unittest tests.test_memory -v
+# 2. Переключиться на ветку task4
+git checkout task4
 
-# Если есть ошибки импорта, создать __init__.py
-New-Item -Path tests\__init__.py -ItemType File -Force
+# 3. Запустить приложение
+py -m src.db
