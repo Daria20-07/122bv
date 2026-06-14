@@ -14,6 +14,10 @@ class Database(ABC):
         pass
     
     @abstractmethod
+    def get_table(self, table_name: str):
+        pass
+    
+    @abstractmethod
     def table_exists(self, table_name: str) -> bool:
         pass
     

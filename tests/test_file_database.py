@@ -5,10 +5,11 @@ Unit tests for JSON file database.
 import unittest
 import tempfile
 import json
+import os
 from pathlib import Path
 
 from src.db.backend.file import FileDatabase
-from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError
+from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError, RecordNotFoundError, InvalidStorageDataError
 
 
 class TestFileDatabase(unittest.TestCase):
@@ -23,6 +24,7 @@ class TestFileDatabase(unittest.TestCase):
     def test_create_table(self):
         self.db.create_table("test", {"name": str})
         self.assertTrue(self.db.table_exists("test"))
+        self.assertIn("test", self.db.list_tables())
     
     def test_create_duplicate_table(self):
         self.db.create_table("test", {"name": str})
@@ -42,6 +44,15 @@ class TestFileDatabase(unittest.TestCase):
         
         records = self.db.select_records("test")
         self.assertEqual(len(records), 2)
+    
+    def test_select_with_filters(self):
+        self.db.create_table("test", {"name": str})
+        self.db.create_record("test", {"name": "John"})
+        self.db.create_record("test", {"name": "Jane"})
+        
+        records = self.db.select_records("test", name="John")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["name"], "John")
     
     def test_persistence(self):
         self.db.create_table("test", {"name": str})
@@ -76,6 +87,41 @@ class TestFileDatabase(unittest.TestCase):
         
         self.db.drop_table("test")
         self.assertFalse(self.db.table_exists("test"))
+    
+    def test_file_created(self):
+        self.db.create_table("test", {"name": str})
+        self.db.create_record("test", {"name": "John"})
+        
+        file_path = Path(self.temp_dir) / "test.json"
+        self.assertTrue(file_path.exists())
+        
+        with open(file_path, 'r', encoding='utf-8') as f:
+            data = json.load(f)
+        self.assertEqual(data["name"], "test")
+        self.assertEqual(len(data["data"]), 1)
+    
+    def test_load_nonexistent_table(self):
+        with self.assertRaises(TableNotFoundError):
+            self.db.select_records("nonexistent")
+    
+    def test_create_index(self):
+        self.db.create_table("test", {"name": str})
+        self.db.create_record("test", {"name": "John"})
+        self.db.create_record("test", {"name": "Jane"})
+        
+        self.db.create_index("test", "name")
+        
+        records = self.db.select_records("test", name="John")
+        self.assertEqual(len(records), 1)
+    
+    def test_sort_records(self):
+        self.db.create_table("test", {"name": str, "age": int})
+        self.db.create_record("test", {"name": "John", "age": 30})
+        self.db.create_record("test", {"name": "Alice", "age": 25})
+        
+        table = self.db.get_table("test")
+        sorted_records = table.sort("age")
+        self.assertEqual(sorted_records[0]["age"], 25)
 
 
 if __name__ == "__main__":

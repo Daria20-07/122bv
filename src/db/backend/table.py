@@ -71,6 +71,10 @@ class Table:
         if field_name in self._indexes:
             del self._indexes[field_name]
     
+    def get_indexes(self) -> Dict[str, Dict[Any, List[int]]]:
+        """Get all indexes."""
+        return self._indexes.copy()
+    
     def create(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Add a new record."""
         self._validate_record(record)
