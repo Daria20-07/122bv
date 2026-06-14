@@ -49,6 +49,10 @@ class FileDatabase(Database):
             raise TableAlreadyExistsError(f"Table '{table_name}' already exists")
         self._save_table(Table(table_name, schema))
     
+    def get_table(self, table_name: str) -> Table:
+        """Get a table by name."""
+        return self._load_table(table_name)
+    
     def table_exists(self, table_name: str) -> bool:
         return self._get_table_path(table_name).exists()
     
@@ -85,3 +89,17 @@ class FileDatabase(Database):
         result = table.delete(record_id)
         self._save_table(table)
         return result
+    
+    def sort_records(self, table_name: str, field: str, reverse: bool = False) -> List[Dict[str, Any]]:
+        table = self._load_table(table_name)
+        return table.sort(field, reverse)
+    
+    def create_index(self, table_name: str, field_name: str) -> None:
+        table = self._load_table(table_name)
+        table.create_index(field_name)
+        self._save_table(table)
+    
+    def drop_index(self, table_name: str, field_name: str) -> None:
+        table = self._load_table(table_name)
+        table.drop_index(field_name)
+        self._save_table(table)
