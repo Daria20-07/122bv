@@ -166,3 +166,45 @@ class TestTable(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+    def test_index_update_on_record_change(self):
+        """Test that indexes are updated when record changes."""
+        self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        self.table.create_index("name")
+        
+        # Update record - should update index
+        self.table.update(1, {"name": "Jonathan"})
+        
+        # Old name should not be in index
+        indexes = self.table.get_indexes()
+        self.assertNotIn("John", indexes["name"])
+        self.assertIn("Jonathan", indexes["name"])
+    
+    def test_index_update_on_record_delete(self):
+        """Test that indexes are updated when record is deleted."""
+        self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        self.table.create_index("name")
+        
+        # Delete record - should remove from index
+        self.table.delete(1)
+        
+        indexes = self.table.get_indexes()
+        self.assertNotIn("John", indexes["name"])
+    
+    def test_multiple_indexes(self):
+        """Test creating multiple indexes on different fields."""
+        self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        self.table.create({"name": "Jane", "age": 30, "city": "SPb"})
+        
+        self.table.create_index("name")
+        self.table.create_index("age")
+        
+        indexes = self.table.get_indexes()
+        self.assertIn("name", indexes)
+        self.assertIn("age", indexes)
+        
+        # Test both indexes work
+        by_name = self.table.read(name="John")
+        by_age = self.table.read(age=30)
+        
+        self.assertEqual(len(by_name), 1)
+        self.assertEqual(len(by_age), 1)

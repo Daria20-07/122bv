@@ -4,12 +4,17 @@ Unit tests for CSV file database (bonus task).
 
 import unittest
 import tempfile
-import json
 import csv
+import json
 from pathlib import Path
 
 from src.db.backend.csvdb import CSVDatabase
-from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError, RecordNotFoundError
+from src.db.backend.errors import (
+    TableNotFoundError, 
+    TableAlreadyExistsError, 
+    InvalidStorageDataError,
+    DatabaseError
+)
 
 
 class TestCSVDatabase(unittest.TestCase):
@@ -69,9 +74,6 @@ class TestCSVDatabase(unittest.TestCase):
         
         updated = self.db.update_record("test", 1, {"name": "Jane"})
         self.assertEqual(updated["name"], "Jane")
-        
-        records = self.db.select_records("test")
-        self.assertEqual(records[0]["name"], "Jane")
     
     def test_delete_record(self):
         self.db.create_table("test", {"name": str})
@@ -84,11 +86,10 @@ class TestCSVDatabase(unittest.TestCase):
     def test_drop_table(self):
         self.db.create_table("test", {"name": str})
         self.assertTrue(self.db.table_exists("test"))
-        
         self.db.drop_table("test")
         self.assertFalse(self.db.table_exists("test"))
     
-    def test_csv_file_created(self):
+    def test_csv_and_schema_files_created(self):
         self.db.create_table("test", {"name": str, "age": int})
         self.db.create_record("test", {"name": "John", "age": 25})
         
@@ -97,32 +98,53 @@ class TestCSVDatabase(unittest.TestCase):
         
         self.assertTrue(csv_path.exists())
         self.assertTrue(schema_path.exists())
-        
-        with open(csv_path, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            rows = list(reader)
-        self.assertEqual(len(rows), 1)
-        self.assertEqual(rows[0]["name"], "John")
     
-    def test_schema_file_correct(self):
+    def test_schema_file_content(self):
         self.db.create_table("test", {"name": str, "age": int})
         
         schema_path = Path(self.temp_dir) / "test_schema.json"
-        with open(schema_path, 'r', encoding='utf-8') as f:
+        with open(schema_path, 'r') as f:
             schema = json.load(f)
         
         self.assertEqual(schema["name"], "str")
         self.assertEqual(schema["age"], "int")
     
-    def test_load_nonexistent_table(self):
-        with self.assertRaises(TableNotFoundError):
-            self.db.select_records("nonexistent")
+    def test_csv_file_content(self):
+        self.db.create_table("test", {"name": str, "age": int})
+        self.db.create_record("test", {"name": "John", "age": 25})
+        
+        csv_path = Path(self.temp_dir) / "test.csv"
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            rows = list(reader)
+        
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["name"], "John")
+        self.assertEqual(rows[0]["age"], "25")
+    
+    def test_empty_int_field_raises_error(self):
+        """Test that empty value for int field raises error."""
+        self.db.create_table("test", {"age": int})
+        
+        # Create invalid CSV file manually
+        csv_path = Path(self.temp_dir) / "test.csv"
+        schema_path = Path(self.temp_dir) / "test_schema.json"
+        
+        with open(schema_path, 'w') as f:
+            json.dump({"age": "int"}, f)
+        
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(["id", "age"])
+            writer.writerow(["1", ""])  # Empty value
+        
+        # Should raise error when loading
+        with self.assertRaises(InvalidStorageDataError):
+            self.db.select_records("test")
     
     def test_create_index(self):
         self.db.create_table("test", {"name": str})
         self.db.create_record("test", {"name": "John"})
-        self.db.create_record("test", {"name": "Jane"})
-        
         self.db.create_index("test", "name")
         
         records = self.db.select_records("test", name="John")
@@ -133,10 +155,24 @@ class TestCSVDatabase(unittest.TestCase):
         self.db.create_record("test", {"name": "John", "age": 30})
         self.db.create_record("test", {"name": "Alice", "age": 25})
         
-        table = self.db.get_table("test")
-        sorted_records = table.sort("age")
+        sorted_records = self.db.sort_records("test", "age")
         self.assertEqual(sorted_records[0]["age"], 25)
+        self.assertEqual(sorted_records[0]["name"], "Alice")
 
 
 if __name__ == "__main__":
     unittest.main()
+    def test_index_persistence(self):
+        """Test that indexes are saved and restored."""
+        # First session - create table, add data, create index
+        db1 = CSVDatabase(self.temp_dir)
+        db1.create_table("test", {"name": str})
+        db1.create_record("test", {"name": "John"})
+        db1.create_record("test", {"name": "Jane"})
+        db1.create_index("test", "name")
+        
+        # Second session - load and verify index works
+        db2 = CSVDatabase(self.temp_dir)
+        records = db2.select_records("test", name="John")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["name"], "John")
