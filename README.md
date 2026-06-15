@@ -1,20 +1,21 @@
 # In-Memory Database Management System (File Storage Version)
 
 ## Структура проекта
+'''text
 PIOA-122bv/
 ├── src/
 │ └── db/
 │ ├── backend/
 │ │ ├── init.py
-│ │ ├── errors.py # Пользовательские исключения
-│ │ ├── database.py # Абстрактный интерфейс Database
-│ │ ├── table.py # Класс Table с индексами
-│ │ ├── memory.py # In-memory реализация
-│ │ ├── file.py # JSON файловая реализация
-│ │ └── csvdb.py # CSV файловая реализация (бонус)
+│ │ ├── errors.py
+│ │ ├── database.py
+│ │ ├── table.py
+│ │ ├── memory.py
+│ │ ├── file.py
+│ │ └── csvdb.py
 │ ├── init.py
-│ ├── main.py # Точка входа
-│ └── tui.py # Пользовательский интерфейс
+│ ├── main.py
+│ └── tui.py
 ├── tests/
 │ ├── init.py
 │ ├── test_memory.py
@@ -23,6 +24,7 @@ PIOA-122bv/
 │ └── test_csv_database.py
 ├── .gitignore
 └── README.md
+'''
 
 ## Сравнение реализаций
 

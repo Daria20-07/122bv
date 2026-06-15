@@ -124,19 +124,21 @@ class TestCSVDatabase(unittest.TestCase):
     
     def test_empty_int_field_raises_error(self):
         """Test that empty value for int field raises error."""
-        self.db.create_table("test", {"age": int})
-        
-        # Create invalid CSV file manually
-        csv_path = Path(self.temp_dir) / "test.csv"
+        # Create schema file directly
         schema_path = Path(self.temp_dir) / "test_schema.json"
-        
-        with open(schema_path, 'w') as f:
+        with open(schema_path, 'w', encoding='utf-8') as f:
             json.dump({"age": "int"}, f)
         
-        with open(csv_path, 'w', newline='') as f:
+        # Create CSV with invalid data (empty value for int)
+        csv_path = Path(self.temp_dir) / "test.csv"
+        with open(csv_path, 'w', newline='', encoding='utf-8') as f:
             writer = csv.writer(f)
             writer.writerow(["id", "age"])
             writer.writerow(["1", ""])  # Empty value
+        
+        # Clear cache if table exists
+        if "test" in self.db._cache:
+            del self.db._cache["test"]
         
         # Should raise error when loading
         with self.assertRaises(InvalidStorageDataError):
@@ -158,10 +160,7 @@ class TestCSVDatabase(unittest.TestCase):
         sorted_records = self.db.sort_records("test", "age")
         self.assertEqual(sorted_records[0]["age"], 25)
         self.assertEqual(sorted_records[0]["name"], "Alice")
-
-
-if __name__ == "__main__":
-    unittest.main()
+    
     def test_index_persistence(self):
         """Test that indexes are saved and restored."""
         # First session - create table, add data, create index
@@ -176,3 +175,7 @@ if __name__ == "__main__":
         records = db2.select_records("test", name="John")
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["name"], "John")
+
+
+if __name__ == "__main__":
+    unittest.main()

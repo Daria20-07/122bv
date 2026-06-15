@@ -3,6 +3,13 @@ Database package initialization.
 """
 
 from .backend import memory
-from .tui import run
+from .tui import TUI
 
-__all__ = ['memory', 'run']
+
+def run():
+    """Entry point for the database application."""
+    app = TUI()
+    app.run()
+
+
+__all__ = ['memory', 'run', 'TUI']

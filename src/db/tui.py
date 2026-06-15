@@ -8,14 +8,17 @@ from .backend.database import Database
 from .backend.memory import MemoryDatabase
 from .backend.file import FileDatabase
 from .backend.csvdb import CSVDatabase
-from .backend.errors import DatabaseError, RecordNotFoundError, ValidationError, InvalidFieldTypeError
+from .backend.errors import DatabaseError
 
 
 class TUI:
+    """Text User Interface for database management."""
+    
     def __init__(self):
         self.database = self._select_database()
     
     def _select_database(self) -> Database:
+        """Select database backend."""
         print("\n" + "=" * 50)
         print("  Database Selection")
         print("=" * 50)
@@ -40,19 +43,24 @@ class TUI:
                 print("[ERROR] Invalid choice")
     
     def _print_header(self, text: str) -> None:
+        """Print a formatted header."""
         print("\n" + text)
         print("-" * 40)
     
     def _print_success(self, message: str) -> None:
+        """Print a success message."""
         print(f"[OK] {message}")
     
     def _print_error(self, message: str) -> None:
+        """Print an error message."""
         print(f"[ERROR] {message}")
     
     def _print_info(self, message: str) -> None:
+        """Print an info message."""
         print(f"[INFO] {message}")
     
     def _read_int(self, prompt: str, allow_empty: bool = False) -> Optional[int]:
+        """Read an integer from console input."""
         while True:
             raw = input(prompt).strip()
             if allow_empty and raw == "":
@@ -63,6 +71,7 @@ class TUI:
                 self._print_error("Enter a valid integer")
     
     def _read_string(self, prompt: str, allow_empty: bool = False) -> Optional[str]:
+        """Read a string from console input."""
         value = input(prompt).strip()
         if allow_empty and value == "":
             return None
@@ -78,6 +87,7 @@ class TUI:
         return value
     
     def _select_table(self, action_name: str) -> Optional[str]:
+        """Select a table from existing tables."""
         try:
             tables = self.database.list_tables()
         except DatabaseError as e:
@@ -104,12 +114,14 @@ class TUI:
         return tables[choice - 1]
     
     def _print_record(self, record: Dict[str, Any]) -> None:
+        """Print a single record."""
         print("  " + "-" * 30)
         for key, value in record.items():
             print(f"    {key}: {value}")
         print("  " + "-" * 30)
     
     def _print_records(self, records: List[Dict[str, Any]]) -> None:
+        """Print a list of records."""
         if not records:
             self._print_info("No records found")
             return
@@ -118,6 +130,7 @@ class TUI:
             self._print_record(record)
     
     def _create_table(self) -> None:
+        """Create a new table."""
         self._print_header("Create New Table")
         
         while True:
@@ -178,6 +191,7 @@ class TUI:
             self._print_error(str(e))
     
     def _add_record(self) -> None:
+        """Add a new record."""
         table_name = self._select_table("adding record")
         if not table_name:
             return
@@ -212,6 +226,7 @@ class TUI:
             self._print_error(str(e))
     
     def _read_records(self) -> None:
+        """Read records with filters."""
         table_name = self._select_table("viewing records")
         if not table_name:
             return
@@ -243,6 +258,7 @@ class TUI:
             self._print_error(str(e))
     
     def _update_record(self) -> None:
+        """Update a record."""
         table_name = self._select_table("updating record")
         if not table_name:
             return
@@ -291,6 +307,7 @@ class TUI:
             self._print_error(str(e))
     
     def _delete_record(self) -> None:
+        """Delete a record."""
         table_name = self._select_table("deleting record")
         if not table_name:
             return
@@ -320,6 +337,7 @@ class TUI:
             self._print_error(str(e))
     
     def _list_tables(self) -> None:
+        """List all tables."""
         self._print_header("List of Tables")
         try:
             tables = self.database.list_tables()
@@ -339,6 +357,7 @@ class TUI:
                 print(f"{i}. {name}")
     
     def _drop_table(self) -> None:
+        """Delete a table."""
         try:
             tables = self.database.list_tables()
         except DatabaseError as e:
@@ -368,6 +387,7 @@ class TUI:
                 self._print_error(str(e))
     
     def _sort_records_menu(self) -> None:
+        """Sort records by field."""
         table_name = self._select_table("sorting records")
         if not table_name:
             return
@@ -412,6 +432,7 @@ class TUI:
             self._print_error(str(e))
     
     def _create_index_menu(self) -> None:
+        """Create an index on a field."""
         table_name = self._select_table("creating index")
         if not table_name:
             return
@@ -442,6 +463,7 @@ class TUI:
             self._print_error(str(e))
     
     def _print_menu(self) -> None:
+        """Print main menu."""
         self._print_header("In-Memory Database Management System")
         print("\nDATA OPERATIONS:")
         print("  1. Add record (CREATE)")
@@ -463,6 +485,7 @@ class TUI:
             print(f"\n[STATUS] Cannot get table list")
     
     def run(self) -> None:
+        """Run the main application loop."""
         self._print_header("Welcome to In-Memory Database")
         self._print_info("Supports Memory, JSON, and CSV storage backends")
         
@@ -499,5 +522,10 @@ class TUI:
 
 
 def run() -> None:
+    """Entry point for the TUI."""
     app = TUI()
     app.run()
+
+
+if __name__ == "__main__":
+    run()

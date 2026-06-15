@@ -18,12 +18,10 @@ class Table:
     
     def _validate_record(self, record: Dict[str, Any]) -> None:
         """Validate record against schema."""
-        # Check for required fields
         for field in self.schema:
             if field not in record:
                 raise MissingFieldError(f"Missing required field: {field}")
         
-        # Check field types
         for field, value in record.items():
             if field not in self.schema and field != 'id':
                 raise InvalidFieldTypeError(f"Unknown field: {field}")
@@ -91,7 +89,7 @@ class Table:
         return new_record.copy()
     
     def read(self, **filters) -> List[Dict[str, Any]]:
-        """Read records with optional filtering."""
+        """Read records with optional filtering using indexes when possible."""
         if not filters:
             return [record.copy() for record in self._data]
         
@@ -100,19 +98,30 @@ class Table:
             if field not in self.schema and field != 'id':
                 raise InvalidFieldTypeError(f"Unknown filter field: {field}")
         
-        # Try to use index for single field filter
-        if len(filters) == 1:
-            for field, value in filters.items():
-                if field in self._indexes and value in self._indexes[field]:
-                    result_ids = self._indexes[field][value]
-                    result = []
-                    for record in self._data:
-                        if record.get('id') in result_ids:
-                            # Verify all filters match (important for composite keys)
-                            match = all(record.get(f) == v for f, v in filters.items())
-                            if match:
-                                result.append(record.copy())
-                    return result
+        # Find the best index to use (the one with smallest candidate set)
+        best_index_field = None
+        best_index_value = None
+        best_index_size = None
+        
+        for field, value in filters.items():
+            if field in self._indexes and value in self._indexes[field]:
+                candidate_size = len(self._indexes[field][value])
+                if best_index_size is None or candidate_size < best_index_size:
+                    best_index_field = field
+                    best_index_value = value
+                    best_index_size = candidate_size
+        
+        # If we have a good index, use it as starting point
+        if best_index_field is not None:
+            result_ids = self._indexes[best_index_field][best_index_value]
+            result = []
+            for record in self._data:
+                if record.get('id') in result_ids:
+                    # Check all filters match
+                    match = all(record.get(f) == v for f, v in filters.items())
+                    if match:
+                        result.append(record.copy())
+            return result
         
         # Fallback to linear scan
         result = []
@@ -168,7 +177,6 @@ class Table:
     
     def sort(self, field: str, reverse: bool = False) -> List[Dict[str, Any]]:
         """Sort records by field. Check field against schema."""
-        # Check if field exists in schema
         if field not in self.schema and field != 'id':
             raise ValidationError(f"Cannot sort by unknown field: {field}")
         
@@ -179,12 +187,9 @@ class Table:
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert table to dictionary for serialization (including indexes)."""
-        # Convert indexes to serializable format
         serialized_indexes = {}
         for field_name, index in self._indexes.items():
-            serialized_indexes[field_name] = {
-                str(k): v for k, v in index.items()
-            }
+            serialized_indexes[field_name] = {str(k): v for k, v in index.items()}
         
         return {
             'name': self.name,
@@ -208,10 +213,8 @@ class Table:
         # Restore indexes
         if 'indexes' in data:
             for field_name, index_data in data['indexes'].items():
-                # Convert string keys back to original types
                 index = {}
                 for str_key, ids in index_data.items():
-                    # Try to convert back to original type
                     try:
                         key = int(str_key) if str_key.isdigit() else str_key
                     except ValueError:
