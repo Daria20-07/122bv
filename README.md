@@ -1,7 +1,7 @@
 # In-Memory Database Management System (File Storage Version)
 
 ## Структура проекта
-'''text
+```text
 PIOA-122bv/
 ├── src/
 │ └── db/
@@ -24,7 +24,7 @@ PIOA-122bv/
 │ └── test_csv_database.py
 ├── .gitignore
 └── README.md
-'''
+```
 
 ## Сравнение реализаций
 
