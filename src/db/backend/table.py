@@ -58,13 +58,14 @@ class Table:
             return
         
         self._indexes[field_name] = {}
-        for idx, record in enumerate(self._data):
+        for record in self._data:
             if field_name in record:
                 value = record[field_name]
-                record_id = record.get('id', idx + 1)
+                record_id = record['id']
                 if value not in self._indexes[field_name]:
                     self._indexes[field_name][value] = []
-                self._indexes[field_name][value].append(record_id)
+                if record_id not in self._indexes[field_name][value]:
+                    self._indexes[field_name][value].append(record_id)
     
     def drop_index(self, field_name: str) -> None:
         """Drop an index on a field."""
@@ -92,22 +93,31 @@ class Table:
         if not filters:
             return [record.copy() for record in self._data]
         
-        # Try to use index
-        for field, value in filters.items():
-            if field in self._indexes and value in self._indexes[field]:
-                result_ids = self._indexes[field][value]
-                result = []
-                for record in self._data:
-                    if record.get('id') in result_ids:
-                        match = all(record.get(f) == v for f, v in filters.items())
-                        if match:
+        # Validate filter fields against schema
+        for field in filters:
+            if field not in self.schema and field != 'id':
+                raise InvalidFieldTypeError(f"Unknown filter field: {field}")
+        
+        # Try to use index for single field filter
+        if len(filters) == 1:
+            for field, value in filters.items():
+                if field in self._indexes and value in self._indexes[field]:
+                    result_ids = self._indexes[field][value]
+                    result = []
+                    for record in self._data:
+                        if record.get('id') in result_ids:
                             result.append(record.copy())
-                return result
+                    return result
         
         # Fallback to linear scan
         result = []
         for record in self._data:
-            if all(record.get(field) == value for field, value in filters.items()):
+            match = True
+            for field, value in filters.items():
+                if record.get(field) != value:
+                    match = False
+                    break
+            if match:
                 result.append(record.copy())
         return result
     
@@ -149,11 +159,15 @@ class Table:
         self._indexes.clear()
     
     def sort(self, field: str, reverse: bool = False) -> List[Dict[str, Any]]:
+        """Sort records by field. Check field against schema."""
+        # Check if field exists in schema
+        if field not in self.schema and field != 'id':
+            raise ValidationError(f"Cannot sort by unknown field: {field}")
+        
         if not self._data:
             return []
-        if field not in self._data[0]:
-            raise ValidationError(f"Cannot sort by unknown field: {field}")
-        return sorted(self._data, key=lambda x: x[field], reverse=reverse)
+        
+        return sorted(self._data, key=lambda x: x.get(field), reverse=reverse)
     
     def to_dict(self) -> Dict[str, Any]:
         """Convert table to dictionary for serialization."""

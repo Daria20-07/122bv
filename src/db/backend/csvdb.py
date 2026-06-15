@@ -4,18 +4,22 @@ CSV-based file database implementation (bonus task).
 
 import csv
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
 from .database import Database
-from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError
+from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError, DatabaseError
 from .table import Table
 
 
 class CSVDatabase(Database):
     def __init__(self, directory: str = "data_csv"):
         self.directory = Path(directory)
-        self.directory.mkdir(parents=True, exist_ok=True)
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise DatabaseError(f"Cannot create directory '{directory}': {e}") from e
         self._cache: Dict[str, Table] = {}
     
     def _get_table_path(self, table_name: str) -> Path:
@@ -37,13 +41,18 @@ class CSVDatabase(Database):
         try:
             with schema_path.open('r', encoding='utf-8') as f:
                 schema_data = json.load(f)
-            
-            schema = {}
-            for field, type_name in schema_data.items():
-                schema[field] = str if type_name == 'str' else int
-            
-            table = Table(table_name, schema)
-            
+        except json.JSONDecodeError as e:
+            raise InvalidStorageDataError(f"Invalid JSON in schema file for {table_name}") from e
+        except OSError as e:
+            raise DatabaseError(f"Cannot read schema file '{schema_path}': {e}") from e
+        
+        schema = {}
+        for field, type_name in schema_data.items():
+            schema[field] = str if type_name == 'str' else int
+        
+        table = Table(table_name, schema)
+        
+        try:
             with table_path.open('r', encoding='utf-8', newline='') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
@@ -52,15 +61,18 @@ class CSVDatabase(Database):
                         if field == 'id':
                             continue
                         if field in schema and schema[field] == int:
-                            converted_row[field] = int(value) if value else 0
+                            try:
+                                converted_row[field] = int(value) if value else 0
+                            except ValueError:
+                                converted_row[field] = 0
                         else:
                             converted_row[field] = value
                     table.create(converted_row)
-            
-            self._cache[table_name] = table
-            return table
-        except Exception as e:
-            raise InvalidStorageDataError(f"Error loading CSV table {table_name}: {e}") from e
+        except OSError as e:
+            raise DatabaseError(f"Cannot read CSV file '{table_path}': {e}") from e
+        
+        self._cache[table_name] = table
+        return table
     
     def _save_table(self, table: Table) -> None:
         table_path = self._get_table_path(table.name)
@@ -69,15 +81,21 @@ class CSVDatabase(Database):
         schema_data = {field: 'str' if t == str else 'int' 
                        for field, t in table.schema.items()}
         
-        with schema_path.open('w', encoding='utf-8') as f:
-            json.dump(schema_data, f, ensure_ascii=False, indent=2)
+        try:
+            with schema_path.open('w', encoding='utf-8') as f:
+                json.dump(schema_data, f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            raise DatabaseError(f"Cannot write schema file '{schema_path}': {e}") from e
         
         fieldnames = ['id'] + list(table.schema.keys())
         
-        with table_path.open('w', encoding='utf-8', newline='') as f:
-            writer = csv.DictWriter(f, fieldnames=fieldnames)
-            writer.writeheader()
-            writer.writerows(table.get_all())
+        try:
+            with table_path.open('w', encoding='utf-8', newline='') as f:
+                writer = csv.DictWriter(f, fieldnames=fieldnames)
+                writer.writeheader()
+                writer.writerows(table.get_all())
+        except OSError as e:
+            raise DatabaseError(f"Cannot write CSV file '{table_path}': {e}") from e
         
         self._cache[table.name] = table
     
@@ -87,8 +105,12 @@ class CSVDatabase(Database):
         self._save_table(Table(table_name, schema))
     
     def get_table(self, table_name: str) -> Table:
-        """Get a table by name."""
         return self._load_table(table_name)
+    
+    def get_table_schema(self, table_name: str) -> Dict[str, type]:
+        """Get schema of a table."""
+        table = self._load_table(table_name)
+        return table.schema.copy()
     
     def table_exists(self, table_name: str) -> bool:
         return self._get_table_path(table_name).exists()
@@ -102,15 +124,24 @@ class CSVDatabase(Database):
         schema_path = self._get_schema_path(table_name)
         
         if table_path.exists():
-            table_path.unlink()
-            deleted = True
+            try:
+                table_path.unlink()
+                deleted = True
+            except OSError as e:
+                raise DatabaseError(f"Cannot delete file '{table_path}': {e}") from e
         if schema_path.exists():
-            schema_path.unlink()
+            try:
+                schema_path.unlink()
+            except OSError as e:
+                raise DatabaseError(f"Cannot delete file '{schema_path}': {e}") from e
         
         return deleted
     
     def list_tables(self) -> List[str]:
-        return [f.stem for f in self.directory.glob("*.csv")]
+        try:
+            return [f.stem for f in self.directory.glob("*.csv")]
+        except OSError as e:
+            raise DatabaseError(f"Cannot read directory '{self.directory}': {e}") from e
     
     def create_record(self, table_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
         table = self._load_table(table_name)

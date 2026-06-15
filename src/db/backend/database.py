@@ -18,6 +18,11 @@ class Database(ABC):
         pass
     
     @abstractmethod
+    def get_table_schema(self, table_name: str) -> Dict[str, type]:
+        """Get schema of a table."""
+        pass
+    
+    @abstractmethod
     def table_exists(self, table_name: str) -> bool:
         pass
     
@@ -43,4 +48,19 @@ class Database(ABC):
     
     @abstractmethod
     def delete_record(self, table_name: str, record_id: int) -> bool:
+        pass
+    
+    @abstractmethod
+    def sort_records(self, table_name: str, field: str, reverse: bool = False) -> List[Dict[str, Any]]:
+        """Sort records by field."""
+        pass
+    
+    @abstractmethod
+    def create_index(self, table_name: str, field_name: str) -> None:
+        """Create an index on a field."""
+        pass
+    
+    @abstractmethod
+    def drop_index(self, table_name: str, field_name: str) -> None:
+        """Drop an index on a field."""
         pass

@@ -3,18 +3,22 @@ JSON-based file database implementation.
 """
 
 import json
+import os
 from pathlib import Path
 from typing import Any, Dict, List
 
 from .database import Database
-from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError
+from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError, DatabaseError
 from .table import Table
 
 
 class FileDatabase(Database):
     def __init__(self, directory: str = "data"):
         self.directory = Path(directory)
-        self.directory.mkdir(parents=True, exist_ok=True)
+        try:
+            self.directory.mkdir(parents=True, exist_ok=True)
+        except OSError as e:
+            raise DatabaseError(f"Cannot create directory '{directory}': {e}") from e
         self._cache: Dict[str, Table] = {}
     
     def _get_table_path(self, table_name: str) -> Path:
@@ -33,6 +37,8 @@ class FileDatabase(Database):
                 data = json.load(f)
         except json.JSONDecodeError as e:
             raise InvalidStorageDataError(f"Invalid JSON in {table_name}.json") from e
+        except OSError as e:
+            raise DatabaseError(f"Cannot read file '{table_path}': {e}") from e
         
         table = Table.from_dict(data)
         self._cache[table_name] = table
@@ -40,8 +46,11 @@ class FileDatabase(Database):
     
     def _save_table(self, table: Table) -> None:
         table_path = self._get_table_path(table.name)
-        with table_path.open('w', encoding='utf-8') as f:
-            json.dump(table.to_dict(), f, ensure_ascii=False, indent=2)
+        try:
+            with table_path.open('w', encoding='utf-8') as f:
+                json.dump(table.to_dict(), f, ensure_ascii=False, indent=2)
+        except OSError as e:
+            raise DatabaseError(f"Cannot write to file '{table_path}': {e}") from e
         self._cache[table.name] = table
     
     def create_table(self, table_name: str, schema: Dict[str, type]) -> None:
@@ -50,8 +59,12 @@ class FileDatabase(Database):
         self._save_table(Table(table_name, schema))
     
     def get_table(self, table_name: str) -> Table:
-        """Get a table by name."""
         return self._load_table(table_name)
+    
+    def get_table_schema(self, table_name: str) -> Dict[str, type]:
+        """Get schema of a table."""
+        table = self._load_table(table_name)
+        return table.schema.copy()
     
     def table_exists(self, table_name: str) -> bool:
         return self._get_table_path(table_name).exists()
@@ -61,12 +74,18 @@ class FileDatabase(Database):
             del self._cache[table_name]
         table_path = self._get_table_path(table_name)
         if table_path.exists():
-            table_path.unlink()
+            try:
+                table_path.unlink()
+            except OSError as e:
+                raise DatabaseError(f"Cannot delete file '{table_path}': {e}") from e
             return True
         return False
     
     def list_tables(self) -> List[str]:
-        return [f.stem for f in self.directory.glob("*.json")]
+        try:
+            return [f.stem for f in self.directory.glob("*.json")]
+        except OSError as e:
+            raise DatabaseError(f"Cannot read directory '{self.directory}': {e}") from e
     
     def create_record(self, table_name: str, record: Dict[str, Any]) -> Dict[str, Any]:
         table = self._load_table(table_name)

@@ -8,7 +8,7 @@ from .backend.database import Database
 from .backend.memory import MemoryDatabase
 from .backend.file import FileDatabase
 from .backend.csvdb import CSVDatabase
-from .backend.errors import DatabaseError, RecordNotFoundError, ValidationError
+from .backend.errors import DatabaseError, RecordNotFoundError, ValidationError, InvalidFieldTypeError
 
 
 class TUI:
@@ -68,6 +68,15 @@ class TUI:
             return None
         return value
     
+    def _convert_filter_value(self, value: str, field_type: type) -> Any:
+        """Convert filter value to the correct type based on schema."""
+        if field_type == int:
+            try:
+                return int(value)
+            except ValueError:
+                return None
+        return value
+    
     def _select_table(self, action_name: str) -> Optional[str]:
         tables = self.database.list_tables()
         if not tables:
@@ -79,7 +88,7 @@ class TUI:
             try:
                 count = len(self.database.select_records(t))
                 print(f"  {i}. {t} ({count} records)")
-            except:
+            except DatabaseError:
                 print(f"  {i}. {t}")
         
         choice = self._read_int(f"\nSelect table (1-{len(tables)}): ")
@@ -166,25 +175,18 @@ class TUI:
         
         self._print_header(f"Add Record to '{table_name}'")
         
-        # Try to get schema from existing records
+        # Get schema from the database
         try:
-            records = self.database.select_records(table_name)
-            if records:
-                schema = {k: type(v) for k, v in records[0].items() if k != 'id'}
-            else:
-                fields_input = self._read_string("Fields (comma-separated): ")
-                if not fields_input:
-                    self._print_error("At least one field required")
-                    return
-                schema = {f.strip(): str for f in fields_input.split(',')}
-        except:
-            self._print_error("Could not determine table schema")
+            schema = self.database.get_table_schema(table_name)
+        except DatabaseError as e:
+            self._print_error(f"Could not get table schema: {e}")
             return
         
         record = {}
-        for field in schema:
+        print("\nEnter data:")
+        for field, field_type in schema.items():
             while True:
-                if schema[field] == int:
+                if field_type == int:
                     value = self._read_int(f"  {field}: ")
                 else:
                     value = self._read_string(f"  {field}: ")
@@ -207,16 +209,23 @@ class TUI:
             return
         
         self._print_header(f"View Records in '{table_name}'")
-        print("\nFilters (Enter to skip):")
         
+        # Get schema for type conversion
+        try:
+            schema = self.database.get_table_schema(table_name)
+        except DatabaseError as e:
+            self._print_error(f"Could not get table schema: {e}")
+            return
+        
+        print("\nFilters (Enter to skip):")
         filters = {}
-        while True:
-            field = self._read_string("Field name (or 'done'): ")
-            if not field or field.lower() == 'done':
-                break
-            value = self._read_string(f"Value for {field}: ")
+        
+        for field, field_type in schema.items():
+            value = self._read_string(f"  {field}: ", allow_empty=True)
             if value is not None:
-                filters[field] = value
+                converted_value = self._convert_filter_value(value, field_type)
+                if converted_value is not None:
+                    filters[field] = converted_value
         
         try:
             records = self.database.select_records(table_name, **filters)
@@ -241,23 +250,26 @@ class TUI:
                 self._print_error(f"Record {record_id} not found")
                 return
             
+            schema = self.database.get_table_schema(table_name)
+            
             self._print_info("Current record:")
             self._print_record(records[0])
             
             updates = {}
             print("\nNew values (Enter to keep):")
-            for field, value in records[0].items():
-                if field == 'id':
-                    continue
-                new_value = self._read_string(f"  {field} [{value}]: ", allow_empty=True)
-                if new_value:
-                    if isinstance(value, int):
+            for field, field_type in schema.items():
+                current = records[0].get(field, "")
+                if field_type == int:
+                    new_value = self._read_string(f"  {field} [{current}]: ", allow_empty=True)
+                    if new_value:
                         try:
                             updates[field] = int(new_value)
                         except ValueError:
                             self._print_error(f"Invalid integer for {field}")
                             return
-                    else:
+                else:
+                    new_value = self._read_string(f"  {field} [{current}]: ", allow_empty=True)
+                    if new_value:
                         updates[field] = new_value
             
             if updates:
@@ -310,7 +322,7 @@ class TUI:
             try:
                 count = len(self.database.select_records(name))
                 print(f"{i}. {name} - {count} records")
-            except:
+            except DatabaseError:
                 print(f"{i}. {name}")
     
     def _drop_table(self) -> None:
@@ -334,6 +346,72 @@ class TUI:
             self.database.drop_table(table_name)
             self._print_success(f"Table '{table_name}' deleted")
     
+    def _sort_records_menu(self) -> None:
+        table_name = self._select_table("sorting records")
+        if not table_name:
+            return
+        
+        self._print_header(f"Sort Records in '{table_name}'")
+        
+        try:
+            schema = self.database.get_table_schema(table_name)
+            records = self.database.select_records(table_name)
+            if not records:
+                self._print_info("Table is empty")
+                return
+            
+            fields = list(schema.keys())
+            print("\nFields for sorting:")
+            for i, field in enumerate(fields, 1):
+                print(f"  {i}. {field}")
+            
+            choice = self._read_int(f"\nSelect field (1-{len(fields)}): ")
+            if not choice or choice < 1 or choice > len(fields):
+                self._print_error("Invalid choice")
+                return
+            
+            field = fields[choice - 1]
+            
+            print("\nOrder:")
+            print("  1. Ascending")
+            print("  2. Descending")
+            
+            order = self._read_int("Choose (1-2): ")
+            reverse = (order == 2)
+            
+            sorted_records = self.database.sort_records(table_name, field, reverse)
+            order_text = "descending" if reverse else "ascending"
+            self._print_success(f"Sorted by '{field}' ({order_text})")
+            self._print_records(sorted_records)
+        except DatabaseError as e:
+            self._print_error(str(e))
+    
+    def _create_index_menu(self) -> None:
+        table_name = self._select_table("creating index")
+        if not table_name:
+            return
+        
+        self._print_header(f"Create Index on '{table_name}'")
+        
+        try:
+            schema = self.database.get_table_schema(table_name)
+            fields = list(schema.keys())
+            
+            print("\nAvailable fields:")
+            for i, field in enumerate(fields, 1):
+                print(f"  {i}. {field}")
+            
+            choice = self._read_int(f"\nSelect field to index (1-{len(fields)}): ")
+            if not choice or choice < 1 or choice > len(fields):
+                self._print_error("Invalid choice")
+                return
+            
+            field = fields[choice - 1]
+            self.database.create_index(table_name, field)
+            self._print_success(f"Index created on field '{field}'")
+        except DatabaseError as e:
+            self._print_error(str(e))
+    
     def _print_menu(self) -> None:
         self._print_header("In-Memory Database Management System")
         print("\nDATA OPERATIONS:")
@@ -341,10 +419,12 @@ class TUI:
         print("  2. View records (READ)")
         print("  3. Update record (UPDATE)")
         print("  4. Delete record (DELETE)")
+        print("  5. Sort records (SORT)")
+        print("  6. Create index (INDEX)")
         print("\nTABLE MANAGEMENT:")
-        print("  5. Create table")
-        print("  6. Delete table")
-        print("  7. List tables")
+        print("  7. Create table")
+        print("  8. Delete table")
+        print("  9. List tables")
         print("\n  0. Exit")
         
         tables = self.database.list_tables()
@@ -367,10 +447,14 @@ class TUI:
             elif choice == 4:
                 self._delete_record()
             elif choice == 5:
-                self._create_table()
+                self._sort_records_menu()
             elif choice == 6:
-                self._drop_table()
+                self._create_index_menu()
             elif choice == 7:
+                self._create_table()
+            elif choice == 8:
+                self._drop_table()
+            elif choice == 9:
                 self._list_tables()
             elif choice == 0:
                 self._print_info("Goodbye!")
