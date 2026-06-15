@@ -61,17 +61,6 @@ class TestTable(unittest.TestCase):
         with self.assertRaises(InvalidFieldTypeError):
             self.table.read(invalid_field="value")
     
-    def test_read_with_multiple_filters_uses_index(self):
-        """Test that multi-filter queries can use indexes."""
-        for i in range(100):
-            self.table.create({"name": f"User{i}", "age": i % 50, "city": "Moscow"})
-        
-        self.table.create_index("age")
-        
-        # Should use index for age filter
-        records = self.table.read(age=25, city="Moscow")
-        self.assertEqual(len(records), 2)  # age 25 appears twice (i=25 and i=75)
-    
     def test_update_record(self):
         self.table.create({"name": "John", "age": 25, "city": "Moscow"})
         updated = self.table.update(1, {"age": 26, "city": "SPb"})
@@ -216,6 +205,17 @@ class TestTable(unittest.TestCase):
         
         self.assertEqual(len(by_name), 1)
         self.assertEqual(len(by_age), 1)
+    
+    def test_read_with_multiple_filters_uses_index(self):
+        """Test that multi-filter queries can use indexes."""
+        for i in range(100):
+            self.table.create({"name": f"User{i}", "age": i % 50, "city": "Moscow"})
+        
+        self.table.create_index("age")
+        
+        # Should use index for age filter
+        records = self.table.read(age=25, city="Moscow")
+        self.assertEqual(len(records), 2)  # age 25 appears twice
 
 
 if __name__ == "__main__":
