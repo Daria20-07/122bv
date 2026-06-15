@@ -4,12 +4,11 @@ CSV-based file database implementation (bonus task).
 
 import csv
 import json
-import os
 from pathlib import Path
 from typing import Any, Dict, List
 
 from .database import Database
-from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError, DatabaseError
+from .errors import TableNotFoundError, TableAlreadyExistsError, InvalidStorageDataError, DatabaseError, ValidationError
 from .table import Table
 
 
@@ -38,11 +37,12 @@ class CSVDatabase(Database):
         if not table_path.exists():
             raise TableNotFoundError(f"Table '{table_name}' not found")
         
+        # Load schema
         try:
             with schema_path.open('r', encoding='utf-8') as f:
                 schema_data = json.load(f)
         except json.JSONDecodeError as e:
-            raise InvalidStorageDataError(f"Invalid JSON in schema file for {table_name}") from e
+            raise InvalidStorageDataError(f"Invalid JSON in schema file for {table_name}: {e}") from e
         except OSError as e:
             raise DatabaseError(f"Cannot read schema file '{schema_path}': {e}") from e
         
@@ -52,6 +52,7 @@ class CSVDatabase(Database):
         
         table = Table(table_name, schema)
         
+        # Load data from CSV
         try:
             with table_path.open('r', encoding='utf-8', newline='') as f:
                 reader = csv.DictReader(f)
@@ -60,11 +61,16 @@ class CSVDatabase(Database):
                     for field, value in row.items():
                         if field == 'id':
                             continue
-                        if field in schema and schema[field] == int:
+                        if field not in schema:
+                            raise InvalidStorageDataError(f"Unknown field '{field}' in CSV file for table '{table_name}'")
+                        
+                        if schema[field] == int:
+                            if value == '' or value is None:
+                                raise InvalidStorageDataError(f"Empty value for integer field '{field}' in table '{table_name}'")
                             try:
-                                converted_row[field] = int(value) if value else 0
-                            except ValueError:
-                                converted_row[field] = 0
+                                converted_row[field] = int(value)
+                            except ValueError as e:
+                                raise InvalidStorageDataError(f"Invalid integer value '{value}' for field '{field}' in table '{table_name}'") from e
                         else:
                             converted_row[field] = value
                     table.create(converted_row)

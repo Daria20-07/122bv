@@ -36,7 +36,7 @@ class FileDatabase(Database):
             with table_path.open('r', encoding='utf-8') as f:
                 data = json.load(f)
         except json.JSONDecodeError as e:
-            raise InvalidStorageDataError(f"Invalid JSON in {table_name}.json") from e
+            raise InvalidStorageDataError(f"Invalid JSON in {table_name}.json: {e}") from e
         except OSError as e:
             raise DatabaseError(f"Cannot read file '{table_path}': {e}") from e
         

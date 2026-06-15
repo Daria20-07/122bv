@@ -4,7 +4,7 @@ Unit tests for MemoryDatabase.
 
 import unittest
 from src.db.backend.memory import MemoryDatabase
-from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError, RecordNotFoundError
+from src.db.backend.errors import TableNotFoundError, TableAlreadyExistsError, RecordNotFoundError, InvalidFieldTypeError
 
 
 class TestMemoryDatabase(unittest.TestCase):
@@ -30,6 +30,11 @@ class TestMemoryDatabase(unittest.TestCase):
         with self.assertRaises(TableNotFoundError):
             self.db.get_table("nonexistent")
     
+    def test_get_table_schema(self):
+        self.db.create_table("users", {"name": str, "age": int})
+        schema = self.db.get_table_schema("users")
+        self.assertEqual(schema, {"name": str, "age": int})
+    
     def test_drop_table(self):
         self.db.create_table("users", {"name": str})
         self.assertTrue(self.db.table_exists("users"))
@@ -51,13 +56,22 @@ class TestMemoryDatabase(unittest.TestCase):
         self.assertEqual(len(records), 2)
     
     def test_select_with_filters(self):
-        self.db.create_table("users", {"name": str})
-        self.db.create_record("users", {"name": "John"})
-        self.db.create_record("users", {"name": "Jane"})
+        self.db.create_table("users", {"name": str, "age": int})
+        self.db.create_record("users", {"name": "John", "age": 25})
+        self.db.create_record("users", {"name": "Jane", "age": 30})
         
         records = self.db.select_records("users", name="John")
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["name"], "John")
+        
+        records = self.db.select_records("users", age=30)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["name"], "Jane")
+    
+    def test_select_with_invalid_filter(self):
+        self.db.create_table("users", {"name": str})
+        with self.assertRaises(InvalidFieldTypeError):
+            self.db.select_records("users", invalid_field="value")
     
     def test_update_record(self):
         self.db.create_table("users", {"name": str})
@@ -81,6 +95,7 @@ class TestMemoryDatabase(unittest.TestCase):
         
         sorted_records = self.db.sort_records("users", "age")
         self.assertEqual(sorted_records[0]["age"], 25)
+        self.assertEqual(sorted_records[0]["name"], "Alice")
     
     def test_create_index(self):
         self.db.create_table("users", {"name": str})
@@ -90,6 +105,16 @@ class TestMemoryDatabase(unittest.TestCase):
         table = self.db.get_table("users")
         indexes = table.get_indexes()
         self.assertIn("name", indexes)
+    
+    def test_index_speeds_up_lookup(self):
+        self.db.create_table("users", {"name": str})
+        for i in range(100):
+            self.db.create_record("users", {"name": f"User{i}"})
+        
+        self.db.create_index("users", "name")
+        records = self.db.select_records("users", name="User50")
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["name"], "User50")
 
 
 if __name__ == "__main__":

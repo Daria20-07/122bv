@@ -78,7 +78,12 @@ class TUI:
         return value
     
     def _select_table(self, action_name: str) -> Optional[str]:
-        tables = self.database.list_tables()
+        try:
+            tables = self.database.list_tables()
+        except DatabaseError as e:
+            self._print_error(f"Cannot list tables: {e}")
+            return None
+        
         if not tables:
             self._print_error(f"No tables available. Create a table first")
             return None
@@ -120,9 +125,13 @@ class TUI:
             if not table_name:
                 self._print_error("Table name cannot be empty")
                 continue
-            if self.database.table_exists(table_name):
-                self._print_error(f"Table '{table_name}' already exists")
-                continue
+            try:
+                if self.database.table_exists(table_name):
+                    self._print_error(f"Table '{table_name}' already exists")
+                    continue
+            except DatabaseError as e:
+                self._print_error(f"Cannot check table existence: {e}")
+                return
             break
         
         schema = {}
@@ -175,7 +184,6 @@ class TUI:
         
         self._print_header(f"Add Record to '{table_name}'")
         
-        # Get schema from the database
         try:
             schema = self.database.get_table_schema(table_name)
         except DatabaseError as e:
@@ -210,7 +218,6 @@ class TUI:
         
         self._print_header(f"View Records in '{table_name}'")
         
-        # Get schema for type conversion
         try:
             schema = self.database.get_table_schema(table_name)
         except DatabaseError as e:
@@ -222,10 +229,12 @@ class TUI:
         
         for field, field_type in schema.items():
             value = self._read_string(f"  {field}: ", allow_empty=True)
-            if value is not None:
+            if value is not None and value != "":
                 converted_value = self._convert_filter_value(value, field_type)
                 if converted_value is not None:
                     filters[field] = converted_value
+                else:
+                    self._print_error(f"Invalid value for field '{field}' (expected {field_type.__name__})")
         
         try:
             records = self.database.select_records(table_name, **filters)
@@ -261,7 +270,7 @@ class TUI:
                 current = records[0].get(field, "")
                 if field_type == int:
                     new_value = self._read_string(f"  {field} [{current}]: ", allow_empty=True)
-                    if new_value:
+                    if new_value and new_value != "":
                         try:
                             updates[field] = int(new_value)
                         except ValueError:
@@ -269,7 +278,7 @@ class TUI:
                             return
                 else:
                     new_value = self._read_string(f"  {field} [{current}]: ", allow_empty=True)
-                    if new_value:
+                    if new_value and new_value != "":
                         updates[field] = new_value
             
             if updates:
@@ -312,7 +321,11 @@ class TUI:
     
     def _list_tables(self) -> None:
         self._print_header("List of Tables")
-        tables = self.database.list_tables()
+        try:
+            tables = self.database.list_tables()
+        except DatabaseError as e:
+            self._print_error(f"Cannot list tables: {e}")
+            return
         
         if not tables:
             self._print_info("No tables")
@@ -326,7 +339,12 @@ class TUI:
                 print(f"{i}. {name}")
     
     def _drop_table(self) -> None:
-        tables = self.database.list_tables()
+        try:
+            tables = self.database.list_tables()
+        except DatabaseError as e:
+            self._print_error(f"Cannot list tables: {e}")
+            return
+        
         if not tables:
             self._print_error("No tables")
             return
@@ -343,8 +361,11 @@ class TUI:
         table_name = tables[choice - 1]
         confirm = input(f"Delete '{table_name}'? (y/N): ").strip().lower()
         if confirm == 'y':
-            self.database.drop_table(table_name)
-            self._print_success(f"Table '{table_name}' deleted")
+            try:
+                self.database.drop_table(table_name)
+                self._print_success(f"Table '{table_name}' deleted")
+            except DatabaseError as e:
+                self._print_error(str(e))
     
     def _sort_records_menu(self) -> None:
         table_name = self._select_table("sorting records")
@@ -377,6 +398,10 @@ class TUI:
             print("  2. Descending")
             
             order = self._read_int("Choose (1-2): ")
+            if order not in [1, 2]:
+                self._print_error("Invalid choice")
+                return
+            
             reverse = (order == 2)
             
             sorted_records = self.database.sort_records(table_name, field, reverse)
@@ -396,6 +421,10 @@ class TUI:
         try:
             schema = self.database.get_table_schema(table_name)
             fields = list(schema.keys())
+            
+            if not fields:
+                self._print_info("No fields to index")
+                return
             
             print("\nAvailable fields:")
             for i, field in enumerate(fields, 1):
@@ -427,8 +456,11 @@ class TUI:
         print("  9. List tables")
         print("\n  0. Exit")
         
-        tables = self.database.list_tables()
-        print(f"\n[STATUS] {len(tables)} table(s)")
+        try:
+            tables = self.database.list_tables()
+            print(f"\n[STATUS] {len(tables)} table(s)")
+        except DatabaseError:
+            print(f"\n[STATUS] Cannot get table list")
     
     def run(self) -> None:
         self._print_header("Welcome to In-Memory Database")

@@ -56,6 +56,11 @@ class TestTable(unittest.TestCase):
         records = self.table.read(name="John", city="Moscow")
         self.assertEqual(len(records), 1)
     
+    def test_read_with_invalid_filter_field(self):
+        self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        with self.assertRaises(InvalidFieldTypeError):
+            self.table.read(invalid_field="value")
+    
     def test_update_record(self):
         self.table.create({"name": "John", "age": 25, "city": "Moscow"})
         updated = self.table.update(1, {"age": 26, "city": "SPb"})
@@ -103,6 +108,15 @@ class TestTable(unittest.TestCase):
         self.assertEqual(sorted_records[1]["age"], 30)
         self.assertEqual(sorted_records[2]["age"], 25)
     
+    def test_sort_empty_table(self):
+        sorted_records = self.table.sort("age")
+        self.assertEqual(sorted_records, [])
+    
+    def test_sort_invalid_field(self):
+        self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        with self.assertRaises(ValidationError):
+            self.table.sort("invalid_field")
+    
     def test_create_index(self):
         self.table.create({"name": "John", "age": 25, "city": "Moscow"})
         self.table.create({"name": "Jane", "age": 30, "city": "SPb"})
@@ -110,6 +124,8 @@ class TestTable(unittest.TestCase):
         self.table.create_index("name")
         indexes = self.table.get_indexes()
         self.assertIn("name", indexes)
+        self.assertIn("John", indexes["name"])
+        self.assertIn(1, indexes["name"]["John"])
     
     def test_index_lookup(self):
         self.table.create({"name": "John", "age": 25, "city": "Moscow"})
@@ -126,21 +142,26 @@ class TestTable(unittest.TestCase):
         indexes = self.table.get_indexes()
         self.assertNotIn("name", indexes)
     
-    def test_to_dict(self):
+    def test_to_dict_with_indexes(self):
         self.table.create({"name": "John", "age": 25, "city": "Moscow"})
+        self.table.create_index("name")
+        
         data = self.table.to_dict()
-        self.assertEqual(data["name"], "test_table")
-        self.assertEqual(len(data["data"]), 1)
+        self.assertIn("indexes", data)
+        self.assertIn("name", data["indexes"])
     
-    def test_from_dict(self):
+    def test_from_dict_with_indexes(self):
         original = Table("original", {"name": str})
         original.create({"name": "Test"})
+        original.create_index("name")
         
         data = original.to_dict()
         restored = Table.from_dict(data)
         
         self.assertEqual(restored.name, "original")
         self.assertEqual(restored.count(), 1)
+        indexes = restored.get_indexes()
+        self.assertIn("name", indexes)
 
 
 if __name__ == "__main__":

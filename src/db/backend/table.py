@@ -170,17 +170,25 @@ class Table:
         return sorted(self._data, key=lambda x: x.get(field), reverse=reverse)
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert table to dictionary for serialization."""
+        """Convert table to dictionary for serialization (including indexes)."""
+        # Convert indexes to serializable format
+        serialized_indexes = {}
+        for field_name, index in self._indexes.items():
+            serialized_indexes[field_name] = {
+                str(k): v for k, v in index.items()
+            }
+        
         return {
             'name': self.name,
             'schema': {k: v.__name__ for k, v in self.schema.items()},
             'data': self._data,
-            'next_id': self._next_id
+            'next_id': self._next_id,
+            'indexes': serialized_indexes
         }
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Table':
-        """Create table from dictionary."""
+        """Create table from dictionary (including indexes)."""
         schema = {}
         for field, type_name in data['schema'].items():
             schema[field] = str if type_name == 'str' else int
@@ -189,7 +197,18 @@ class Table:
         table._data = data['data']
         table._next_id = data['next_id']
         
-        for record in table._data:
-            table._update_indexes(record['id'], record)
+        # Restore indexes
+        if 'indexes' in data:
+            for field_name, index_data in data['indexes'].items():
+                # Convert string keys back to original types
+                index = {}
+                for str_key, ids in index_data.items():
+                    # Try to convert back to original type
+                    try:
+                        key = int(str_key) if str_key.isdigit() else str_key
+                    except ValueError:
+                        key = str_key
+                    index[key] = ids
+                table._indexes[field_name] = index
         
         return table
