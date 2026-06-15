@@ -56,24 +56,27 @@ class CSVDatabase(Database):
         try:
             with table_path.open('r', encoding='utf-8', newline='') as f:
                 reader = csv.DictReader(f)
-                for row in reader:
+                for row_num, row in enumerate(reader, start=2):
                     converted_row = {}
                     for field, value in row.items():
                         if field == 'id':
                             continue
                         if field not in schema:
-                            raise InvalidStorageDataError(f"Unknown field '{field}' in CSV file for table '{table_name}'")
+                            raise InvalidStorageDataError(f"Unknown field '{field}' in CSV file for table '{table_name}' at row {row_num}")
                         
                         if schema[field] == int:
                             if value == '' or value is None:
-                                raise InvalidStorageDataError(f"Empty value for integer field '{field}' in table '{table_name}'")
+                                raise InvalidStorageDataError(f"Empty value for integer field '{field}' in table '{table_name}' at row {row_num}")
                             try:
                                 converted_row[field] = int(value)
                             except ValueError as e:
-                                raise InvalidStorageDataError(f"Invalid integer value '{value}' for field '{field}' in table '{table_name}'") from e
+                                raise InvalidStorageDataError(f"Invalid integer value '{value}' for field '{field}' in table '{table_name}' at row {row_num}") from e
                         else:
                             converted_row[field] = value
-                    table.create(converted_row)
+                    try:
+                        table.create(converted_row)
+                    except ValidationError as e:
+                        raise InvalidStorageDataError(f"Validation error in row {row_num} of '{table_name}': {e}") from e
         except OSError as e:
             raise DatabaseError(f"Cannot read CSV file '{table_path}': {e}") from e
         

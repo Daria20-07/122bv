@@ -18,10 +18,12 @@ class Table:
     
     def _validate_record(self, record: Dict[str, Any]) -> None:
         """Validate record against schema."""
+        # Check for required fields
         for field in self.schema:
             if field not in record:
                 raise MissingFieldError(f"Missing required field: {field}")
         
+        # Check field types
         for field, value in record.items():
             if field not in self.schema and field != 'id':
                 raise InvalidFieldTypeError(f"Unknown field: {field}")
@@ -106,7 +108,10 @@ class Table:
                     result = []
                     for record in self._data:
                         if record.get('id') in result_ids:
-                            result.append(record.copy())
+                            # Verify all filters match (important for composite keys)
+                            match = all(record.get(f) == v for f, v in filters.items())
+                            if match:
+                                result.append(record.copy())
                     return result
         
         # Fallback to linear scan
@@ -148,12 +153,15 @@ class Table:
         raise RecordNotFoundError(f"Record with ID {record_id} not found")
     
     def get_all(self) -> List[Dict[str, Any]]:
+        """Get all records."""
         return [record.copy() for record in self._data]
     
     def count(self) -> int:
+        """Get number of records."""
         return len(self._data)
     
     def clear(self) -> None:
+        """Remove all records."""
         self._data.clear()
         self._next_id = 1
         self._indexes.clear()
